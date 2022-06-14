@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<!--Al probar la práctica en nuestros dos ordenadores, en uno no hace falta reescalar la ventana
+en cambio, en otro hay que reescalar la ventana para que funcione correctamente.
+Autores: Iván Pérez Ciruelos - DNI: 03948616E ||  David Pozo Sánchez - DNI: 07269925Q || Fecha de entrega: 31 de Enero de 2021 -->
+
+<!-- Asignamos un icono a la página -->
+<link rel="shortcut icon" href="urjc.png" type="image/x-icon">
+
+<!-- Asignamos un título a la página -->
+<title>Práctica 3: Arkanoid</title>
+
+    <style>
+    	body{
+				background-image: url('fondotileable1.png');
+			}
+			
+      	canvas {	
+			margin: 0 auto;
+			display: block;
+		}
+		
+		p{
+			color:rgb(255,0,0);
+			font-size: 200%;
+			font-style: oblique;
+			margin: 0 auto;
+			display: block;
+			text-align: center;
+			background-color:#92B3E3;
+		}
+		
+		h1 {
+			color:rgb(0,0,0);
+			background-color:#92B3E3;
+            text-align: center;
+            font-size: 150%;
+        }
+
+		h2{
+			color:rgb(0,0,0);
+			text-align: center;
+        	font-size: 175%;
+			background-color:#92B3E3;
+        }
+		
+		h3 {
+			color:rgb(255,255,0);
+            text-align: center;
+            font-size: 225%;
+			background-color:#92B3E3;
+        }
+		
+		h4{
+			color:rgb(0,0,0);
+        	font-size: 120%;
+			background-color:#92B3E3;
+        }
+		
+    </style>
+  </head>
+  <body>
+  <body>
+    
+	<h1> Autores: Iván Pérez Ciruelos - DNI: 03948616E ||  David Pozo Sánchez - DNI: 07269925Q </h1>
+	<h1> Fecha de entrega: 31 de Enero de 2021 </h1>
+	<h1>Práctica 3</h1>
+	<h3>Arkanoid</h3>
+	
+	<!--Cargamos los audios para el juego -->
+	    <audio id="sonidoRebote1">
+		<source src="Rebote1.wav"></source>
+		</audio>
+		<audio id="SonidoGameOver">
+		<source src="GameOver.wav"></source>
+		</audio>
+	    <audio id="SonidoRebote2">
+		<source src="Rebote2.wav"></source>
+		</audio> 
+
+  	<!-- Mostramos por pantalla el número de vidas actual y el nivel -->
+	    <br>
+	    <p id="parrafo1">Número de vidas: </p>
+	    <p id="parrafo2">Nivel 1</p>
+	  
+	    <canvas id="lienzo" width="624" height="796" ></canvas>
+	
+	<h2>Instrucciones: pulse espacio para lanzar la bola</h2>
+	<h2>Movimiento de la raqueta controlado por ratón</h2>
+	<br>
+	<h4>Audios de: https://www.youtube.com/watch?v=peiQJ0NfQf8&ab_channel=ClassicGameMusic</h4>
+	<h4>Imagen de: https://www.muralswallpaper.com/es/shop-murals/blue-retro-game-wall-mural/</h4>
+	<h4>Nota: si no funciona el uso del ratón, reducir el zoom de la pestaña.</h4>
+
+    <script type="text/javascript">
+      	//Variables utilizadas en el canvas
+		var contexto = document.getElementById('lienzo').getContext('2d');
+		var lienzo = document.getElementById('lienzo');
+		var anchoLienzo = lienzo.width;
+		var altoLienzo = lienzo.height;
+
+		//Asignamos valor a los párrafos
+		var parrafo1 = document.getElementById('parrafo1');
+		var parrafo2 = document.getElementById('parrafo2');
+
+		//Inicializamos y creamos los niveles del juego
+		nivelUno = new crearNivelUno();
+		nivelDos = new crearNiveDos();
+
+		//Creamos e inicializamos las variables que necesitamos en el juego
+		var bloques = new arraybloques(65,nivelUno.x,nivelUno.y,nivelUno.color,45,25,nivelUno.vida); //Array de los obstáculos del juego
+		var Jugador = new raqueta(anchoLienzo/2-50,altoLienzo-50,99,30); //Raqueta de juego
+		var misil = new esfera(Jugador.obtenerPosX()+60, Jugador.obtenerPosY()-16, 0, 0, 18, 15); //misil
+		var nivel =0;//Nivel actual
+		var espacio =0;//Tecla para iniciar el juego
+		
+		//Sacar por pantalla el número de vidas actual y actualizamos el número
+		parrafo1.innerHTML = "Número de vidas: " + Jugador.obtenerVidas();
+
+		//variable para almacenar los sprites del juego
+		var arrayDeSprites = Array(6);
+	
+		//Cargamos los sprites del juego
+		cargarSprites(contexto, "hexagon_pattern.png",208,232,0 );
+		cargarSprites(contexto, "border_right.png",6,230,1 );
+		cargarSprites(contexto, "border_left.png",6,230,2);
+		cargarSprites(contexto, "border_top.png",220,7,3 );
+		cargarSprites(contexto, "ball.png", 6,5,4);
+		cargarSprites(contexto, "racket.png",33,10,5 );
+
+		//Sonidos del juego
+		var audioRebote1 = document.getElementById("sonidoRebote1");
+		var audioGameOver = document.getElementById("SonidoGameOver");
+		var audioRebote2 = document.getElementById("SonidoRebote2");
+
+		//Eventos de ratón en el canvas
+		lienzo.addEventListener("mousedown", manejaraton, false);
+		lienzo.addEventListener("mouseup", manejaraton, false);
+		lienzo.addEventListener("mousemove", manejaraton, true);
+
+		//Eventos de teclado
+		window.addEventListener("keypress", manejateclado, false);		
+		
+		window.onload=function(){
+		
+		//Variable temporizador que indica la velocidad del juego
+		var TempVelocidad = setInterval(nuevaPosicion, 1000/40);
+		
+		//Actualizamos los dibujos de la pantalla
+		requestAnimationFrame(actualizarObjetos);
+	}
+		
+		
+///////////////Funciones encargadas construir los objetos del juego////////////
+		//Constructor de 1 bloque
+		function bloque(colores="0,0,0",x="0",y="0",vidas="1"){
+			var posx = x;
+			var posy = y;
+			var vidaBloq = vidas;
+			var colorBloq = colores;
+
+			this.obtenerX = function(){
+				return x;
+			}
+			
+			this.asignarX = function(valor){
+				posx = valor;
+			}
+			
+			this.obtenerY = function(){
+				return y;
+			}
+			
+			this.asignarY = function(valor){
+				posy = valor;
+			}
+			
+			this.obtenerVida = function(){
+				return vidaBloq;
+			}
+			
+			this.asignarVida = function(valor){
+				vidaBloq = valor;
+			}
+			
+			this.obtenerColor = function(){
+				return colorBloq;
+			}
+			
+			this.asignarColor = function(valor){
+				colorBloq = valor;
+			}
+		}
+
+		//Constructor de un array de bloques (los bloques del nivel)
+		function arraybloques(numBloques, posx, posy, color, ancho, alto, vidaB){
+			var bloques = [];
+			var anchoBloq = ancho;
+			var altoBloq = alto;
+			var maximo=numBloques;
+
+			for (var i =0; i<numBloques;i++){
+				bloques[i]= new bloque(color[i],posx[i],posy[i],vidaB[i]);
+			}
+
+			this.obtenerPosXBloque=function(pos){
+				return bloques[pos].obtenerX();
+			}
+			
+			this.obtenerPosYBloque=function(pos){
+				return bloques[pos].obtenerY();
+			}
+			
+			this.obtenerColorBloque=function(pos){
+				return bloques[pos].obtenerColor();
+			}
+			
+			this.obtenerVidaBloque=function(pos){
+				return bloques[pos].obtenerVida();
+			}
+			
+			this.obtenerAnchoLadrillo=function(){
+				return anchoBloq;
+			}
+			
+			this.obtenerAltoLadrillo=function(){
+				return altoBloq;
+			}
+			
+			this.size=function(){
+				return maximo;
+			}
+			
+			this.asignarVidaBloque=function(pos,valor){
+				bloques[pos].asignarVida(valor);
+			}
+			
+			this.asignarColorBloque=function(pos,valor){
+				bloques[pos].asignarColor(valor);
+			}
+			
+			this.asignarPosXBloque=function(pos,valor){
+				bloques[pos].asignarPosX(valor);
+			}
+			
+			this.asignarPosYBloque=function(pos,valor){
+				bloques[pos].asignarPosY(valor);
+			}
+			
+			this.finDeBloques=function(){
+				for (var i=0; i<this.size();i++){
+				if (this.obtenerVidaBloque(i)!=0)	return false;
+			}
+			return true;
+		}
+		}
+		
+		//Constructor de la raqueta
+		function raqueta (posx,posy,ancho,alto){
+			var x=posx;
+			var y=posy;
+			var anchoRaq = ancho;
+			var altoRaq = alto;
+			var vidaRaq =3;
+			
+			this.ratonPulsado=false;
+			
+			this.obtenerPosX=function(){
+				return x;
+			}
+			
+			this.obtenerPosY=function(){
+				return y;
+			}
+			
+			this.obtenerVidas=function(){
+				return vidaRaq;
+			}
+			
+			this.obtenerAncho=function(){
+				return anchoRaq;
+			}
+			
+			this.obtenerAlto=function(){
+				return altoRaq;
+			}
+			
+			this.asignarPosX=function(pos){
+				x=pos;
+			}
+			
+			this.asignarPosY=function(pos){
+				y=pos;
+			}
+			
+			this.asignarVidas=function(vida){
+				vidaRaq=vida;
+			}
+			
+			this.asignarAncho=function(ancho){
+				anchoRaq=ancho;
+			}
+			
+			this.asignarAlto=function(alto){
+				altoRaq=alto;
+			}
+		}
+
+		//Constructor del misil
+		function esfera (posx,posy,velx,vely,ancho,alto){
+			var x=posx;
+			var y=posy;
+			var anchoEsf = ancho;
+			var altoEsf = alto;
+			var velocidadX =velx;
+			var velocidadY = vely;
+
+			this.obtenerPosX=function(){
+				return x;
+			}
+			
+			this.obtenerPosY=function(){
+				return y;
+			}
+			
+			this.obtenerVelX=function(){
+				return velocidadX;
+			}
+			
+			this.obtenerVelY=function(){
+				return velocidadY;
+			}
+			
+			this.obtenerAncho=function(){
+				return anchoEsf;
+			}
+			
+			this.obtenerAlto=function(){
+				return altoEsf;
+			}
+			
+			this.asignarPosX=function(pos){
+				x=pos;
+			}
+			
+			this.asignarPosY=function(pos){
+				y=pos;
+			}
+			
+			this.asignarVelX=function(velx){
+				velocidadX=velx;
+			}
+			
+			this.asignarVelY=function(vely){
+				velocidadY=vely;
+			}
+			
+			this.asignarAncho=function(ancho){
+				anchoEsf=ancho;
+			}
+			
+			this.asignarAlto=function(alto){
+				altoEsf=alto;
+			}
+		}
+
+		//Constructor del nivel uno
+		function crearNivelUno (){
+			this.x=[];
+			this.y =[];
+			this.vida=[];
+			this.color=[];
+			var contador1=0;
+			var contador2=0;
+			
+			for(var i=0;i<65;i++){
+				if(contador1 %13 ==0){
+					contador1=0;
+					contador2++;
+				}
+				this.x[i]=45*contador1+20;
+				this.y[i]=200+25*contador2;
+
+				switch(contador2){
+					case 1:
+						this.color[i]= "#999DA3"; //Gris
+						this.vida[i]=3;
+						break;
+					case 2:
+						this.color[i]="#DF2A2A"; //Rojo
+						this.vida[i]=2;
+						break;
+					case 3:
+						this.color[i]="#FFFC00"; //Amarillo
+						this.vida[i]=2;
+						break;
+					case 4:
+						this.color[i]="#FE12FF"; //Rosa
+						this.vida[i]=1;
+						break;
+					case 5:
+						this.color[i]="#53DF04"; //Verde
+						this.vida[i]=1;
+						break;
+						
+				}
+				contador1++;
+			}
+		}
+
+		//Constructor del nivel 2
+		function crearNiveDos(){
+			this.x=[];
+			this.y =[];
+			this.vida=[];
+			this.color=[];
+			this.tamaño = 0;
+			var contador2=0;
+			
+			for(var i=0; i<13;i++){
+				for(var j=contador2;j<13;j++){
+					this.x[this.tamaño]=45*i+20;
+					this.y[this.tamaño]=200+25*j;
+					
+					
+					switch(i){
+					case 0:
+						this.color[this.tamaño]="#E97E00"; //Naranja
+						this.vida[this.tamaño]=1;
+						break;
+					case 1:
+						this.color[this.tamaño]="#B25DD4"; //Morado1
+						this.vida[this.tamaño]=1;
+						break;
+					case 2:
+						this.color[this.tamaño]="#B5CC18"; //Verde lima
+						this.vida[this.tamaño]=1;
+						break;
+					case 3:
+						this.color[this.tamaño]="#DF2A2A"; //Rojo
+						this.vida[this.tamaño]=1;
+						break;
+					case 4:
+						this.color[this.tamaño]="#18CCC2"; //Azul cian
+						this.vida[this.tamaño]=1;
+						break;
+					case 5:
+						this.color[this.tamaño]="#FF9AFC"; //Rosa claro
+						this.vida[this.tamaño]=1;
+						break;
+					case 6:
+						this.color[this.tamaño]="#FFFC00"; //Amarillo
+						this.vida[this.tamaño]=1;
+						break;
+					case 7:
+						this.color[this.tamaño]="#53DF04"; //Verde
+						this.vida[this.tamaño]=1;
+						break;
+					case 8:
+						this.color[this.tamaño]="#00FFB0"; //verde turquesa
+						this.vida[this.tamaño]=1;
+						break;
+					case 9:
+						this.color[this.tamaño]="#B16B33"; //Marrón
+						this.vida[this.tamaño]=1;
+						break;
+					case 10:
+						this.color[this.tamaño]="#00F8EE"; //azul turquesa
+						this.vida[this.tamaño]=1;
+						break;
+					case 11:
+						this.color[this.tamaño]="#FFFFFF"; //Blanco
+						this.vida[this.tamaño]=1;
+						break;
+					case 12:
+						this.color[this.tamaño]="#7A0000"; //Granate
+						this.vida[this.tamaño]=1;
+						break;
+					}
+					if(j==12 && i!=12){
+						this.color[this.tamaño]="#999DA3"; //Gris
+						this.vida[this.tamaño]=2;
+					}else if(j==12 && i==12){
+						this.color[this.tamaño]="#DF2A2A"; //Rojo
+						this.vida[this.tamaño]=1;
+					}
+					this.tamaño++;
+				}
+				contador2++;
+			}
+		}
+		
+		
+///////////////Funciones encargadas de pintar y actualizar los sprites////////////
+		//Función encargada de actualizar los dibujos de la pantalla
+		function actualizarObjetos(){
+			zonaJuego(contexto);
+			requestAnimationFrame(actualizarObjetos);
+		}
+
+		//Dibujamos todos los sprites correspondiesntes al juego
+		function zonaJuego(contexto){
+			arrayDeSprites[0].dibuja(contexto,0,110,3);
+			arrayDeSprites[1].dibuja(contexto,606,106,3);
+			arrayDeSprites[2].dibuja(contexto,0,106,3);
+			arrayDeSprites[3].dibuja(contexto,0,100,2.835);
+			arrayDeSprites[4].dibuja(contexto,misil.obtenerPosX(),misil.obtenerPosY(),3);
+			arrayDeSprites[5].dibuja(contexto,Jugador.obtenerPosX(),Jugador.obtenerPosY(),3);
+
+			pintaBloques(contexto,bloques);
+		}
+
+
+		//Función encargada de pintar los obstáculos
+		function pintaBloques(contexto, bloques){			
+			var color = contexto.fillStyle;
+			for (var i=0;i<bloques.size();i++){
+				contexto.fillStyle = bloques.obtenerColorBloque(i);
+				if(bloques.obtenerVidaBloque(i)!=0){
+					contexto.fillRect(bloques.obtenerPosXBloque(i),bloques.obtenerPosYBloque(i), bloques.obtenerAnchoLadrillo(), bloques.obtenerAltoLadrillo());
+					contexto.strokeRect(bloques.obtenerPosXBloque(i),bloques.obtenerPosYBloque(i), bloques.obtenerAnchoLadrillo(), bloques.obtenerAltoLadrillo());
+				}
+			}
+			contexto.fillStyle = color;
+		}
+		
+
+		function constructorSprite (spriteOriginal, x, y, ancho, alto){			
+			var sprite = spriteOriginal;
+			this.x = x;
+			this.y = y;
+			this.ancho = ancho;
+			this.alto = alto;
+			this.dibuja = function(contexto, x, y, escala)
+			{
+				contexto.drawImage(sprite, this.x, this.y, this.ancho, this.alto, x, y, this.ancho*escala, this.alto*escala);
+			}			
+		};		
+		
+		function cargarSprites(contexto, nombreDelSprite, anchoSprite, altoSprite, identificadorSprite){
+			var sprite = new Image();
+			sprite.src = nombreDelSprite;
+			sprite.onload = function(){
+				var x = 0;
+				var y = 0;
+				arrayDeSprites[identificadorSprite] = new constructorSprite(sprite, x, y, anchoSprite, altoSprite);
+				identificadorSprite++;
+			}
+		}
+		
+///////////////Funciones encargadas de la detección de colisiones y actualización de las posiciones////////////
+		//Funcion que comprueba si el misil colisiona con la raqueta y en que lado de la misma colisiona
+		function colisionMisilRaqueta(misilColision, esferaColision){
+			var posColisionMisil={x: misilColision.obtenerPosX(),y:misilColision.obtenerPosY(),ancho:misilColision.obtenerAncho(),alto:misilColision.obtenerAlto()};		
+			var ladoIzquierdoRaq = {x: esferaColision.obtenerPosX(), y: esferaColision.obtenerPosY(), ancho: esferaColision.obtenerAncho()/3-9, alto: esferaColision.obtenerAlto()};
+			var ladoCentralRaq  = {x: esferaColision.obtenerPosX() + esferaColision.obtenerAncho()/3-9, y: esferaColision.obtenerPosY(), ancho: esferaColision.obtenerAncho()/3, alto: esferaColision.obtenerAlto()};
+			var ladoDerechoRaq = {x: esferaColision.obtenerPosX() + (esferaColision.obtenerAncho()/3)*2-9, y: esferaColision.obtenerPosY(), ancho: esferaColision.obtenerAncho()/3+9, alto: esferaColision.obtenerAlto()};
+			
+			//Comprobamos si colisiona con el lado izquierdo de la raqueta
+			if ((posColisionMisil.y+posColisionMisil.alto < ladoIzquierdoRaq.y || ladoIzquierdoRaq.y+ladoIzquierdoRaq.alto < posColisionMisil.y || posColisionMisil.x+posColisionMisil.ancho < ladoIzquierdoRaq.x || ladoIzquierdoRaq.x+ladoIzquierdoRaq.ancho < posColisionMisil.x) == false){
+				audioRebote2.play();
+				return 0;
+				
+			//Comprobamos si colisiona con el centro de la raqueta	
+			}else if ((posColisionMisil.y+posColisionMisil.alto < ladoCentralRaq.y || ladoCentralRaq.y+ladoCentralRaq.alto < posColisionMisil.y || posColisionMisil.x+posColisionMisil.ancho < ladoCentralRaq.x || ladoCentralRaq.x+ladoCentralRaq.ancho < posColisionMisil.x) == false){
+				audioRebote2.play();
+				return 1;
+				
+			//Comprobamos si colisiona con el lado derecho de la raqueta
+			}else if ((posColisionMisil.y+posColisionMisil.alto < ladoDerechoRaq.y || ladoDerechoRaq.y+ladoDerechoRaq.alto < posColisionMisil.y || posColisionMisil.x+posColisionMisil.ancho < ladoDerechoRaq.x || ladoDerechoRaq.x+ladoDerechoRaq.ancho < posColisionMisil.x) == false){
+				audioRebote2.play();
+				return 2;
+				
+			//Comprobamos si no ha colisionado con la raqueta
+			}else{
+				return -1;
+			}	
+		}
+
+		//Función que se encarga de la colisión del misil con los bloques
+		function colisionBloques(pelota,bloques){
+			var izquierda,derecha,arriba,abajo =false;
+			var colisionBloques =[];
+			contador =0;
+			var misil = {x:pelota.obtenerPosX(), y:pelota.obtenerPosY(), ancho: pelota.obtenerAncho(), alto: pelota.obtenerAlto()};
+			
+			//Calculamos la colisión del misil con todos los bloques, si colisiona con dos bloques a la vez lo añadimos a colisionBloques
+			for(var i=0;i<bloques.size();i++){
+				
+				var filaBloques = {x: bloques.obtenerPosXBloque(i), y: bloques.obtenerPosYBloque(i), ancho: bloques.obtenerAnchoLadrillo()+bloques.obtenerPosXBloque(i) , alto: bloques.obtenerAltoLadrillo() +bloques.obtenerPosYBloque(i)};
+				
+	
+				//Si el misil colisiona con un bloque, calculamos en que parte del bloque ha colisionado.
+				if ((misil.y+misil.alto <= filaBloques.y || filaBloques.alto <= misil.y || misil.x+misil.ancho <= filaBloques.x || filaBloques.ancho <= misil.x) == false && bloques.obtenerVidaBloque(i)!=0){
+					//Si da en la izquierda del bloque
+					if(bloques.obtenerVidaBloque(i)!=0 && misil.x < filaBloques.x && filaBloques.x < misil.x+misil.ancho &&misil.x+misil.ancho < filaBloques.ancho ){  
+						izquierda=true;
+						colisionBloques[contador]=i;
+						contador++;
+					}
+					//Si da en la derecha del bloque
+					if(bloques.obtenerVidaBloque(i)!=0 && filaBloques.x < misil.x && misil.x < filaBloques.ancho && filaBloques.ancho < misil.x+misil.ancho){
+						derecha=true;
+						colisionBloques[contador]=i;
+						contador++;
+					}
+					//Si da arriba del bloque
+					if(bloques.obtenerVidaBloque(i)!=0 && misil.y < filaBloques.y && filaBloques.y < misil.y+misil.alto && misil.y+misil.alto < filaBloques.alto){
+						arriba=true;
+						colisionBloques[contador]=i;
+						contador++;
+					}
+					//Si da abajo del bloque
+					if(bloques.obtenerVidaBloque(i)!=0 && filaBloques.y < misil.y && misil.y < filaBloques.alto && filaBloques.alto < misil.y +misil.alto){
+						abajo=true;
+						colisionBloques[contador]=i;
+						contador++;
+
+					}
+
+				}
+			}
+			
+			//Eliminamos los elementos repetidos, ya que si da en la esquina de un bloque, este bloque se añadirá dos veces al
+			//array de colisionBloques
+			elementosRepetidos(colisionBloques);
+
+			//Restamos un punto de vida a los bloques con los que ha colisionado
+			for(var i=0;i<colisionBloques.length;i++){
+				bloques.asignarVidaBloque(colisionBloques[i],bloques.obtenerVidaBloque(colisionBloques[i])-1);
+			}
+
+			//Actualizamos la velocidad del misil 
+			if(izquierda) pelota.asignarVelX(-Math.abs(pelota.obtenerVelX())-1);
+			if(derecha) pelota.asignarVelX(Math.abs(pelota.obtenerVelX())+1);
+			if(arriba) pelota.asignarVelY(-Math.abs(pelota.obtenerVelY())-1);
+			if(abajo) pelota.asignarVelY(Math.abs(pelota.obtenerVelY())+1);
+
+			//Sonidos de rebote del misil con un bloque
+			if(izquierda||derecha||arriba||abajo){
+				audioRebote1.play();
+			}
+		}
+		
+		//Funcion encargada de actualizar el juego
+		function nuevaPosicion(){
+			//Detectamos si el misil sale por debajo y se da la condición de derrota				
+			if  ((misil.obtenerPosY() + misil.obtenerAlto()) >= altoLienzo){	
+				Jugador.asignarVidas(Jugador.obtenerVidas()-1);		
+				espacio=0;
+				audioGameOver.play();
+				
+				//Detectamos si perdemos todas las vidas, mostramos el texto "HAS PERDIDO" y reiniciamos el juego al nivel 1
+				if(Jugador.obtenerVidas()==0)	{
+					parrafo2.innerHTML = "HAS PERDIDO";
+					bloques = new arraybloques(65,nivelUno.x,nivelUno.y,nivelUno.color,45,25,nivelUno.vida); 
+					Jugador = new raqueta(anchoLienzo/2-50,altoLienzo-50,99,30); 
+					parrafo1.innerHTML = "Número de vidas: " +Jugador.obtenerVidas();	
+					
+				//Si el misil sale por debajo pero quedan vidas, las actualizamos
+				}else{
+					parrafo1.innerHTML = "Número de vidas: " +Jugador.obtenerVidas();
+				}
+				misil = new esfera(Jugador.obtenerPosX()+60, Jugador.obtenerPosY()-16, 0, 0, 18, 15);
+				
+			//Si el misil toca el sprite de techo, actualizamos la velocidad Y del misil
+			}else if (misil.obtenerPosY() <= 124){
+				misil.asignarVelY(-misil.obtenerVelY());			
+			}			
+								
+			//Detectamos si el misil toca la raqueta, y en caso afirmativo actualizamos su velocidad dependiendo 
+			//en que lado de la raqueta haya rebotado
+			if (colisionMisilRaqueta(misil, Jugador) == 0 ){ //toca por izquierda
+					misil.asignarVelX(-Math.abs(misil.obtenerVelY())-0.1);
+					misil.asignarVelY(-misil.obtenerVelY());
+				
+				}else if (colisionMisilRaqueta(misil, Jugador)  == 1){//toca por en medio
+					misil.asignarVelX(0);
+					misil.asignarVelY(-misil.obtenerVelY());
+				
+				}else if (colisionMisilRaqueta(misil, Jugador) == 2){  //toca por derecha		
+					misil.asignarVelX(Math.abs(misil.obtenerVelY())+0.1);
+					misil.asignarVelY(-misil.obtenerVelY());
+				
+				//Detectamos si el misil colisiona con los sprites de los lados y actualizamos su velocidad	
+				}else if  ((misil.obtenerPosX() + misil.obtenerAncho()) >= anchoLienzo-21 ){
+				misil.asignarVelX (-Math.abs(misil.obtenerVelX()));
+				
+				}else if((misil.obtenerPosX() < 21)&&contador==0){
+				misil.asignarVelX (Math.abs(misil.obtenerVelX()));
+				
+				//Detectamos la colisión del misil con los bloques
+				}else{
+				colisionBloques(misil,bloques);
+				}
+
+			//limitamos la velocidad del misil en Y
+			if (misil.obtenerVelY()*30 > 300)
+				misil.asignarVelY (300/30);
+			
+			if (misil.obtenerVelY()*30 < -300)
+				misil.asignarVelY (-300/30);
+				
+			if (misil.obtenerVelX()*30 > 300)
+				misil.asignarVelX (300/30);
+			
+			if (misil.obtenerVelX()*30 < -300)
+				misil.asignarVelX (-300/30);
+			
+			//Actualizamos la posicion del misil
+			misil.asignarPosX (misil.obtenerVelX()+misil.obtenerPosX());
+			misil.asignarPosY(misil.obtenerVelY()+misil.obtenerPosY());
+			
+			//Detectamos si los bloques se han acabado y distinguimos entre pasar al nivel 2 o ganar el juego
+			if(bloques.finDeBloques()){
+				switch(nivel){
+					case 0://Si acabamos los bloques del nivel 1, pasamos al nivel 2
+						nivel++;
+						bloques = new arraybloques(91,nivelDos.x,nivelDos.y,nivelDos.color,45,25,nivelDos.vida);
+						misil = new esfera(Jugador.obtenerPosX()+60, Jugador.obtenerPosY()-16, 0, 0, 18, 15);
+						espacio =0;
+						parrafo2.innerHTML= "Nivel 2";
+						break;
+						
+					case 1://Si acabamos los bloques del nivel 2, ganamos el juego
+						parrafo2.innerHTML= "HAS GANADO";
+						Jugador = new raqueta(anchoLienzo/2-50,altoLienzo-50,99,30);
+						parrafo1.innerHTML = "Número de vidas: " +Jugador.obtenerVidas();	
+						bloques = new arraybloques(65,nivelUno.x,nivelUno.y,nivelUno.color,45,25,nivelUno.vida);
+						misil = new esfera(Jugador.obtenerPosX()+60, Jugador.obtenerPosY()-16, 0, 0, 18, 15);
+						nivel =0;
+						espacio =0;
+						break;
+				}
+			}
+		}
+
+		//Función que elimina los elementos repetidos de un array
+		function elementosRepetidos(array){
+			for (var i=0;i<array.length;i++){
+				for(var j=i+1;j<array.length;j++){
+					if(array[i]==array[j]){
+						for(var k=j; k< array.length-1;k++){
+							array[k]=array[k+1];
+						}
+						array.pop();
+					}
+				}
+			}
+		}
+		
+				
+///////////////Funciones encargadas de la detección de los eventos de teclado y ratón////////////
+		//Función que detecta el uso de teclado para la lanzar la misil con el espacio
+		function manejateclado (e){
+			if (e.type === "keypress"){
+				if(e.keyCode==32 && espacio ==0) {
+					misil.asignarVelX(3);
+					misil.asignarVelY(-3);
+					espacio=1;
+				}
+			}
+		}
+
+		//Función que detecta el uso del ratón para el movimiento de la raqueta
+		function manejaraton(e){
+			var tamañoJuego = this.getBoundingClientRect();			
+			var posicionXCuadrado = e.pageX - tamañoJuego.left;	
+			var posicionYCuadrado = e.pageY - tamañoJuego.top;						
+			switch (e.type){		
+				case "mousedown":
+								//Se comprueba si se ha hecho click sobre la raqueta
+								if (posicionXCuadrado >= Jugador.obtenerPosX() && posicionXCuadrado <= Jugador.obtenerPosX() + Jugador.obtenerAncho() &&
+									posicionYCuadrado >= Jugador.obtenerPosY() && posicionYCuadrado <= Jugador.obtenerPosY() + Jugador.obtenerAlto()){
+									Jugador.ratonPulsado = true;
+								}
+								break;				
+				case "mouseup":
+								//Se comprueba cuando se deja de hacer click
+								Jugador.ratonPulsado = false;
+								break;
+				case "mousemove":
+								  //Se actualiza la posición del ratón para mover la raqueta si
+								  //previamente se ha hecho click sobre ella
+								  if(Jugador.ratonPulsado == true && posicionXCuadrado <= 0+Jugador.obtenerAncho()/2+18){
+								  		Jugador.asignarPosX(0+18);
+										
+								  }else if(Jugador.ratonPulsado == true && posicionXCuadrado  >= anchoLienzo-Jugador.obtenerAncho()/2-18){
+								  		Jugador.asignarPosX (anchoLienzo-Jugador.obtenerAncho()-18);
+								  
+								  }else if (Jugador.ratonPulsado == true){
+								  		Jugador.asignarPosX(posicionXCuadrado-Jugador.obtenerAncho()/2);
+								  }
+								  break;
+			}
+			
+			//Colocamos el misil en el centro de la raqueta si hemos perdido o no hemos empezado
+			if (espacio == 0){
+				misil.asignarPosX(Jugador.obtenerPosX()+60);
+				misil.asignarPosY(Jugador.obtenerPosY()-16);
+			}
+		}
+		
+		</script>
+  </body>
+</html>  
